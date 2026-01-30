@@ -1,9 +1,14 @@
 """
-Gerenciador de banco de dados - garante persistência dos dados
+Gerenciador de banco de dados - garante persistencia dos dados
 """
 import os
 import sys
 import shutil
+import io
+
+# Forca UTF-8 no stdout para Windows
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 def obter_caminho_db():
     """
@@ -22,7 +27,7 @@ def obter_caminho_db():
         
         # Verifica se já existe o banco na pasta do exe
         if not os.path.exists(db_local):
-            print(f"📦 Primeira execução detectada!")
+            print(f"[INFO] Primeira execucao detectada!")
             print(f"   Extraindo banco de dados inicial...")
             
             # Caminho do banco empacotado dentro do exe
@@ -32,11 +37,11 @@ def obter_caminho_db():
                 # Se existe banco empacotado, copia
                 if os.path.exists(db_empacotado):
                     shutil.copy2(db_empacotado, db_local)
-                    print(f"   ✓ Banco de dados extraído com histórico!")
+                    print(f"   [OK] Banco de dados extraido com historico!")
                 else:
-                    print(f"   ℹ Banco não encontrado no pacote, será criado vazio")
+                    print(f"   [INFO] Banco nao encontrado no pacote, sera criado vazio")
             else:
-                print(f"   ℹ Banco será criado vazio na primeira execução")
+                print(f"   [INFO] Banco sera criado vazio na primeira execucao")
         
         return db_local
     else:
