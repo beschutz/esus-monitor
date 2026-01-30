@@ -6,8 +6,8 @@ import sys
 import shutil
 import io
 
-# Forca UTF-8 no stdout para Windows
-if sys.platform == 'win32':
+# Forca UTF-8 no stdout para Windows (apenas se stdout existir)
+if sys.platform == 'win32' and sys.stdout is not None and hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 def obter_caminho_db():

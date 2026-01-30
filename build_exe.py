@@ -6,8 +6,8 @@ import PyInstaller.__main__
 import os
 import sys
 
-# Força UTF-8 no stdout para evitar erros de encoding no Windows
-if sys.platform == 'win32':
+# Força UTF-8 no stdout para evitar erros de encoding no Windows (apenas se stdout existir)
+if sys.platform == 'win32' and sys.stdout is not None and hasattr(sys.stdout, 'buffer'):
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
