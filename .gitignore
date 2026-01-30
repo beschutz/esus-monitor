@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Chrome/Selenium
+.chrome_profile/
+*.deb
+chromedriver*
+
+# Database e CSV (arquivos grandes - usuário importa localmente)
+*.db
+*.csv
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
+*.spec
