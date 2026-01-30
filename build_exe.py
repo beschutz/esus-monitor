@@ -11,12 +11,12 @@ main_file = "interface.py"
 
 # Arquivos adicionais necessários
 # Nota: pacientes.csv NÃO é incluído - usuário deve colocar na pasta do .exe
+# Nota: esus_monitoramento.db é opcional - será criado na primeira execução
 arquivos_extras = [
     ('esus.py', '.'),  # Script principal
     ('cookie.py', '.'),  # Script de cookies
     ('db_manager.py', '.'),  # Gerenciador do banco
     ('banco_dados.py', '.'),  # Se tiver
-    ('esus_monitoramento.db', '.'),  # Banco de dados com histórico (base inicial)
 ]
 
 # Monta os parâmetros --add-data
@@ -25,6 +25,9 @@ for arquivo, destino in arquivos_extras:
     if os.path.exists(arquivo):
         separador = ';' if os.name == 'nt' else ':'
         add_data_params.append(f'--add-data={arquivo}{separador}{destino}')
+        print(f"  ✓ Incluindo: {arquivo}")
+    else:
+        print(f"  ⚠ Arquivo não encontrado (será ignorado): {arquivo}")
 
 # Bibliotecas ocultas (imports dinâmicos)
 hidden_imports = [
