@@ -4,6 +4,7 @@ from datetime import datetime
 import time
 import threading
 import sys
+import os
 import sqlite3
 import pandas as pd
 import subprocess
@@ -163,14 +164,25 @@ class InterfacePreview:
     def executar_esus(self):
         """Executa o script esus.py e captura a saída"""
         try:
+            # Determina o caminho correto do Python e do script
+            if getattr(sys, 'frozen', False):
+                # Rodando como .exe - esus.py está no sys._MEIPASS
+                script_path = os.path.join(sys._MEIPASS, "esus.py")
+                python_exe = sys.executable
+            else:
+                # Rodando em desenvolvimento
+                script_path = "esus.py"
+                python_exe = sys.executable
+            
             # Executa o script Python
             self.processo_ativo = subprocess.Popen(
-                [sys.executable, "esus.py"],
+                [python_exe, script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' and hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
             # Lê a saída linha por linha
