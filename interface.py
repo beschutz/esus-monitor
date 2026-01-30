@@ -3,6 +3,7 @@ from tkinter import ttk, scrolledtext, messagebox, filedialog
 from datetime import datetime
 import time
 import threading
+import queue
 import sys
 import os
 import sqlite3
@@ -169,39 +170,84 @@ class InterfacePreview:
                 # Rodando como .exe - esus.py está no sys._MEIPASS
                 script_path = os.path.join(sys._MEIPASS, "esus.py")
                 python_exe = sys.executable
+                # Working directory é onde o .exe está
+                cwd = os.path.dirname(sys.executable)
             else:
                 # Rodando em desenvolvimento
                 script_path = "esus.py"
                 python_exe = sys.executable
+                cwd = None  # Usa o diretório atual
+            
+            # Log de debug
+            self.root.after(0, lambda: self.log(f"[DEBUG] Python: {python_exe}", "info"))
+            self.root.after(0, lambda: self.log(f"[DEBUG] Script: {script_path}", "info"))
+            self.root.after(0, lambda: self.log(f"[DEBUG] WorkDir: {cwd or os.getcwd()}", "info"))
+            
+            # Flags para criar processo sem janela no Windows
+            creation_flags = 0
+            if sys.platform == 'win32':
+                creation_flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0x08000000
             
             # Executa o script Python
             self.processo_ativo = subprocess.Popen(
                 [python_exe, script_path],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' and hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                cwd=cwd,
+                creationflags=creation_flags
             )
             
-            # Lê a saída linha por linha
-            for linha in self.processo_ativo.stdout:
-                linha = linha.strip()
-                if linha:
-                    # Determina o tipo de log baseado no conteúdo
-                    if "✓" in linha or "sucesso" in linha.lower():
-                        nivel = "success"
-                    elif "⚠" in linha or "aviso" in linha.lower():
-                        nivel = "warning"
-                    elif "✗" in linha or "erro" in linha.lower():
-                        nivel = "error"
-                    else:
-                        nivel = "info"
-                    
-                    self.root.after(0, lambda l=linha, n=nivel: self.log(l, n))
+            # Lê stdout e stderr simultaneamente
+            from threading import Thread
+            
+            def enqueue_output(pipe, q, tag):
+                try:
+                    for line in iter(pipe.readline, ''):
+                        if line:
+                            q.put((tag, line))
+                    pipe.close()
+                except:
+                    pass
+            
+            q = queue.Queue()
+            stdout_thread = Thread(target=enqueue_output, args=(self.processo_ativo.stdout, q, 'stdout'))
+            stderr_thread = Thread(target=enqueue_output, args=(self.processo_ativo.stderr, q, 'stderr'))
+            stdout_thread.daemon = True
+            stderr_thread.daemon = True
+            stdout_thread.start()
+            stderr_thread.start()
+            
+            # Lê a saída
+            while self.processo_ativo.poll() is None or not q.empty():
+                try:
+                    tag, linha = q.get(timeout=0.1)
+                    linha = linha.strip()
+                    if linha:
+                        # Determina o tipo de log
+                        if tag == 'stderr':
+                            nivel = "error"
+                        elif "✓" in linha or "sucesso" in linha.lower():
+                            nivel = "success"
+                        elif "⚠" in linha or "aviso" in linha.lower():
+                            nivel = "warning"
+                        elif "✗" in linha or "erro" in linha.lower():
+                            nivel = "error"
+                        else:
+                            nivel = "info"
+                        
+                        self.root.after(0, lambda l=linha, n=nivel: self.log(l, n))
+                except queue.Empty:
+                    continue
             
             self.processo_ativo.wait()
+            
+            # Log código de saída
+            exit_code = self.processo_ativo.returncode
+            if exit_code != 0:
+                self.root.after(0, lambda: self.log(f"[ERRO] Processo terminou com código: {exit_code}", "error"))
             
             # Finaliza
             self.root.after(0, self.finalizar_execucao)
