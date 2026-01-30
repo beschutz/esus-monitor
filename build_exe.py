@@ -25,9 +25,9 @@ for arquivo, destino in arquivos_extras:
     if os.path.exists(arquivo):
         separador = ';' if os.name == 'nt' else ':'
         add_data_params.append(f'--add-data={arquivo}{separador}{destino}')
-        print(f"  ✓ Incluindo: {arquivo}")
+        print(f"  [OK] Incluindo: {arquivo}")
     else:
-        print(f"  ⚠ Arquivo não encontrado (será ignorado): {arquivo}")
+        print(f"  [AVISO] Arquivo nao encontrado (sera ignorado): {arquivo}")
 
 # Bibliotecas ocultas (imports dinâmicos)
 hidden_imports = [
