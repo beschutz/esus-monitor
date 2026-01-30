@@ -6,6 +6,7 @@ import threading
 import queue
 import sys
 import os
+import io
 import sqlite3
 import pandas as pd
 import subprocess
@@ -165,23 +166,106 @@ class InterfacePreview:
     def executar_esus(self):
         """Executa o script esus.py e captura a saída"""
         try:
-            # Determina o caminho correto do Python e do script
+            # Se estiver rodando como .exe, executa diretamente sem subprocess
             if getattr(sys, 'frozen', False):
-                # Rodando como .exe - esus.py está no sys._MEIPASS
-                script_path = os.path.join(sys._MEIPASS, "esus.py")
-                python_exe = sys.executable
-                # Working directory é onde o .exe está
-                cwd = os.path.dirname(sys.executable)
+                self.executar_esus_direto()
             else:
-                # Rodando em desenvolvimento
-                script_path = "esus.py"
-                python_exe = sys.executable
-                cwd = None  # Usa o diretório atual
+                # Em desenvolvimento, usa subprocess
+                self.executar_esus_subprocess()
+                
+        except Exception as e:
+            self.root.after(0, lambda: self.log(f"Erro ao executar: {e}", "error"))
+            self.root.after(0, self.finalizar_execucao)
+
+    def executar_esus_direto(self):
+        """Executa esus.py diretamente no mesmo processo (modo .exe)"""
+        try:
+            # Redireciona stdout para capturar prints
+            old_stdout = sys.stdout
+            old_stderr = sys.stderr
+            
+            # Cria um buffer para capturar a saída
+            captured_output = io.StringIO()
+            sys.stdout = captured_output
+            sys.stderr = captured_output
+            
+            # Thread para ler a saída em tempo real
+            def monitor_output():
+                while self.processo_ativo:
+                    output = captured_output.getvalue()
+                    lines = output.split('\n')
+                    
+                    # Processa cada linha nova
+                    for linha in lines:
+                        if linha.strip() and linha not in getattr(self, '_linhas_processadas', set()):
+                            if not hasattr(self, '_linhas_processadas'):
+                                self._linhas_processadas = set()
+                            self._linhas_processadas.add(linha)
+                            
+                            # Determina o tipo de log
+                            if "sucesso" in linha.lower() or "[OK]" in linha:
+                                nivel = "success"
+                            elif "aviso" in linha.lower() or "[AVISO]" in linha:
+                                nivel = "warning"
+                            elif "erro" in linha.lower() or "[ERRO]" in linha:
+                                nivel = "error"
+                            else:
+                                nivel = "info"
+                            
+                            self.root.after(0, lambda l=linha.strip(), n=nivel: self.log(l, n))
+                    
+                    time.sleep(0.1)
+            
+            # Inicia thread de monitoramento
+            monitor_thread = threading.Thread(target=monitor_output, daemon=True)
+            monitor_thread.start()
+            
+            # Importa e executa o esus.py
+            self.processo_ativo = True
+            
+            # Muda para o diretório do .exe
+            original_dir = os.getcwd()
+            exe_dir = os.path.dirname(sys.executable)
+            os.chdir(exe_dir)
+            
+            try:
+                # Importa o módulo esus
+                import esus
+                
+                # Se houver uma função main ou similar, chama ela
+                # Senão, o código é executado automaticamente no import
+                
+            except Exception as e:
+                self.root.after(0, lambda: self.log(f"[ERRO] {str(e)}", "error"))
+            finally:
+                # Restaura diretório original
+                os.chdir(original_dir)
+                
+                # Restaura stdout/stderr
+                sys.stdout = old_stdout
+                sys.stderr = old_stderr
+                
+                # Finaliza
+                self.processo_ativo = False
+                self.root.after(0, self.finalizar_execucao)
+                
+        except Exception as e:
+            sys.stdout = old_stdout if 'old_stdout' in locals() else sys.stdout
+            sys.stderr = old_stderr if 'old_stderr' in locals() else sys.stderr
+            self.root.after(0, lambda: self.log(f"Erro ao executar: {e}", "error"))
+            self.root.after(0, self.finalizar_execucao)
+
+    def executar_esus_subprocess(self):
+        """Executa esus.py via subprocess (modo desenvolvimento)"""
+        try:
+            # Rodando em desenvolvimento
+            script_path = "esus.py"
+            python_exe = sys.executable
+            cwd = None  # Usa o diretório atual
             
             # Log de debug
             self.root.after(0, lambda: self.log(f"[DEBUG] Python: {python_exe}", "info"))
             self.root.after(0, lambda: self.log(f"[DEBUG] Script: {script_path}", "info"))
-            self.root.after(0, lambda: self.log(f"[DEBUG] WorkDir: {cwd or os.getcwd()}", "info"))
             
             # Flags para criar processo sem janela no Windows
             creation_flags = 0
